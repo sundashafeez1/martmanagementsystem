@@ -1,0 +1,136 @@
+for user mart:
+create user mart identified by 123;
+grant connect to mart;
+grant create session grant any privilege to mart;
+grant connect, dba to mart;
+grant unlimited tablespace to mart;
+commit;
+
+
+Tables:
+admin:
+create table admin(adminid int primary key,adminname varchar(100),adminpassword varchar(100));
+insert into admin(adminid,adminname,adminpassword) values (1,'farhan','123');
+
+company:
+create table company(companyid int primary key,companyname varchar(100));
+
+category:
+create table category(categoryid int primary key,categoryname varchar(100));
+
+cahier:
+create table cashier(cashierid int primary key,cashierpassword varchar(100),cashiername varchar(100),cashiersalary int,cashierhiredate date);
+
+customer:
+create table customer(customerid int primary key,customerpassword varchar(100),customername varchar(100),customergender varchar(100),customerage int,customeraddress varchar(100),customeremail varchar(100));
+
+product:
+create table product(productid int primary key,productname varchar(100),productprice int,productmanufacturingdate date,productexpirydate date,productcompanyid int,foreign key(productcompanyid) references company(companyid),productcategoryid int,foreign key(productcategoryid) references category(categoryid),productquantity int);
+
+transaction:
+create table transaction(transactionid int primary key,transactionamount int,transactiondate date,transactioncahierid int,foreign key(transactioncahierid) references cashier(cashierid),transactioncustomerid int,foreign key(transactioncustomerid) references customer(customerid));
+
+detail:
+create table detail(detailtransactionid int,foreign key(detailtransactionid) references transaction(transactionid),detailproductid int,foreign key(detailproductid) references product(productid),detailamount int,productquantity int,detailtransactiondate date,constraint pk_1 primary key (detailtransactionid,detailproductid));
+
+******************DATE FUNCTION*************************
+to_date(2019/05/15,'yyyy/mm/dd')
+
+*****************PL/SQL FUNCTION:(ONLY FOR 1 ROW)*****************
+create or replace function detailmart(a number) return varchar
+as
+dti number;
+dpi number;
+da number;
+pq number;
+dtd date;
+begin
+select detailtransactionid,detailproductid,detailamount,productquantity,to_date(detailtransactiondate,'yyyy/mm/dd') into dti,dpi,da,pq,dtd
+from detail
+where detailproductid=a;
+return (dti || dpi || da || pq || dtd);
+end;
+
+
+declare
+s number;
+begin
+s := detailmart(1);
+dbms_output.put_line(s);
+end;
+/
+
+************For retrieve table,function from database***************
+select text from all_source where name='detailmart2' order by line;
+
+
+****************VIEWS*******************
+1.create view cashier_transaction as select *from transaction where transactioncahierid=1;
+2.create view cashier2_transaction as select *from transaction where transactioncahierid=2;
+
+
+
+
+***********PL/SQL PROCEDURE(CURSOR BASED):(FOR MULTIPLE ROWS)**************
+CREATE OR REPLACE PROCEDURE detailmart2
+(dpi in detail.detailproductid%type)
+AS
+cursor dm is
+select detailtransactionid,detailproductid,detailamount,productquantity
+from detail
+where detailproductid=dpi;
+detail_rec dm%rowtype;
+begin
+open dm;
+loop
+fetch dm into detail_rec;
+exit when dm%notfound;
+dbms_output.put_line(detail_rec.detailtransactionid || ' ' || detail_rec.detailproductid || ' ' || detail_rec.detailamount || ' ' || detail_rec.productquantity);
+end loop;
+close dm;
+end;
+
+begin
+detailmart2(1);
+END;
+
+******TRIGGER FOR CASHIER_SALARY*********
+CREATE OR REPLACE TRIGGER cashier_sal_trigger
+BEFORE INSERT OR UPDATE ON cashier
+FOR EACH ROW
+BEGIN
+IF(:NEW.cashiersalary < 5000) THEN
+RAISE_APPLICATION_ERROR(-20999,'SALARY SHOULD BE GREATER THAN 5000');
+END IF;
+END;
+
+//UPDATE CASHIER SET CASHIERSALARY=6000 WHERE CASHIERID=5;
+
+******TRIGGER FOR product_quantity*********
+CREATE OR REPLACE TRIGGER product_quantity_trigger
+BEFORE INSERT OR UPDATE ON product
+FOR EACH ROW
+BEGIN
+IF(:NEW.productquantity >= 300) THEN
+RAISE_APPLICATION_ERROR(-20999,'PRODUCT QUANTITY SHOULD BE LESS THAN 300');
+END IF;
+END;
+
+//UPDATE PRODUCT SET PRODUCTQUANTITY=200 WHERE PRODUCTID=15;
+
+
+******TRIGGER FOR product_price*********
+CREATE OR REPLACE TRIGGER product_price_trigger
+BEFORE INSERT OR UPDATE ON product
+FOR EACH ROW
+BEGIN
+IF(:NEW.productprice = 0) THEN
+RAISE_APPLICATION_ERROR(-20999,'PRODUCT PRICE IS NOT BE 0');
+END IF;
+END;
+
+//insert into product(productid,productprice,productquantity,productcompanyid,productcategoryid) values (15,NULL,298,1,1);
+
+//UPDATE  PRODUCT SET PRODUCTPRICE=0 WHERE PRODUCTID=15;
+
+
